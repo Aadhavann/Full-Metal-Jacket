@@ -1,0 +1,17 @@
+body {
+	margin: 0;
+	overflow: hidden;
+	font-family: sans-serif;
+}
+
+#info {
+	position: absolute;
+	top: 10px;
+	width: 100%;
+	text-align: center;
+	color: #fff;
+	z-index: 100;
+	pointer-events: none;
+	font-size: 14px;
+	text-shadow: 0 0 5px black;
+}

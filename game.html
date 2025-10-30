@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Full Rubber Jacket</title>
+		<meta charset=utf-8 />
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				margin: 0;
+				overflow: hidden;
+				font-family: sans-serif;
+			}
+
+			#info {
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				color: #fff;
+				z-index: 100;
+				pointer-events: none;
+				font-size: 14px;
+				text-shadow: 0 0 5px black;
+			}
+
+			#scoreboard {
+				position: absolute;
+				top: 50px;
+				width: 100%;
+				display: flex;
+				justify-content: center;
+				gap: 40px;
+				color: #fff;
+				z-index: 100;
+				pointer-events: none;
+				font-size: 24px;
+				font-weight: bold;
+				text-shadow: 0 0 10px black;
+			}
+
+			.score-item {
+				background: rgba(0, 0, 0, 0.5);
+				padding: 10px 20px;
+				border-radius: 10px;
+			}
+
+			.you {
+				color: #4CAF50;
+			}
+
+			.opponent {
+				color: #f44336;
+			}
+
+			#game-over {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				background: rgba(0, 0, 0, 0.9);
+				padding: 40px;
+				border-radius: 15px;
+				color: white;
+				text-align: center;
+				z-index: 200;
+				display: none;
+			}
+
+			#game-over h1 {
+				font-size: 48px;
+				margin-bottom: 20px;
+			}
+
+			#game-over button {
+				margin-top: 20px;
+				padding: 15px 30px;
+				font-size: 18px;
+				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+				color: white;
+				border: none;
+				border-radius: 5px;
+				cursor: pointer;
+				pointer-events: all;
+			}
+
+			#game-over button:hover {
+				transform: scale(1.05);
+			}
+
+			#respawn-message {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				background: rgba(0, 0, 0, 0.7);
+				padding: 20px 40px;
+				border-radius: 10px;
+				color: white;
+				font-size: 24px;
+				z-index: 150;
+				display: none;
+			}
+
+			#container {
+				width: 100%;
+				height: 100vh;
+			}
+
+			#crosshair {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				width: 20px;
+				height: 20px;
+				pointer-events: none;
+				z-index: 50;
+			}
+
+			#crosshair::before,
+			#crosshair::after {
+				content: '';
+				position: absolute;
+				background: white;
+			}
+
+			#crosshair::before {
+				top: 50%;
+				left: 0;
+				width: 100%;
+				height: 2px;
+				transform: translateY(-50%);
+			}
+
+			#crosshair::after {
+				left: 50%;
+				top: 0;
+				height: 100%;
+				width: 2px;
+				transform: translateX(-50%);
+			}
+		</style>
+	</head>
+	<body>
+		<div id="info">
+			MOUSE to look around and shoot<br/>
+			WASD to move and SPACE to jump
+		</div>
+
+		<div id="scoreboard">
+			<div class="score-item you">
+				You: <span id="your-score">0</span>
+			</div>
+			<div class="score-item opponent">
+				<span id="opponent-name">Opponent</span>: <span id="opponent-score">0</span>
+			</div>
+		</div>
+
+		<div id="crosshair"></div>
+		<div id="respawn-message">Respawning...</div>
+
+		<div id="game-over">
+			<h1 id="game-result"></h1>
+			<p id="final-score"></p>
+			<button onclick="returnToLobby()">Return to Lobby</button>
+		</div>
+
+		<div id="container"></div>
+
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "./build/three.module.js",
+					"three/addons/": "./jsm/"
+				}
+			}
+		</script>
+
+		<script type="module">
+			import * as THREE from 'three';
+			import Stats from 'three/addons/libs/stats.module.js';
+			import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+			import { Octree } from 'three/addons/math/Octree.js';
+			import { Capsule } from 'three/addons/math/Capsule.js';
+
+			// Get game parameters from URL
+			const urlParams = new URLSearchParams(window.location.search);
+			const gameId = urlParams.get('gameId');
+			const playerNumber = parseInt(urlParams.get('playerNumber'));
+			const urlOpponentId = parseInt(urlParams.get('opponentId'));
+			const urlOpponentName = urlParams.get('opponentName');
+
+			if (!gameId || !playerNumber || !urlOpponentId || !urlOpponentName) {
+				console.error('Missing URL parameters:', { gameId, playerNumber, urlOpponentId, urlOpponentName });
+				window.location.href = '/lobby.html';
+			}
+
+			// WebSocket connection
+			let ws = null;
+			let myUserId = null;
+			let opponentUserId = urlOpponentId;
+			let opponentUsername = urlOpponentName;
+			let myScore = 0;
+			let opponentScore = 0;
+			let isDead = false;
+			let gameStarted = false;
+
+			console.log('Game initialized with opponent:', opponentUsername, '(ID:', opponentUserId, ')');
+
+			const clock = new THREE.Clock();
+			const scene = new THREE.Scene();
+			scene.background = new THREE.Color( 0x88ccee );
+
+			const camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 0.1, 1000 );
+			camera.rotation.order = 'YXZ';
+
+			const fillLight1 = new THREE.HemisphereLight( 0x8dc1de, 0x00668d, 1.5 );
+			fillLight1.position.set( 2, 1, 1 );
+			scene.add( fillLight1 );
+
+			const directionalLight = new THREE.DirectionalLight( 0xffffff, 2.5 );
+			directionalLight.position.set( - 5, 25, - 1 );
+			directionalLight.castShadow = true;
+			directionalLight.shadow.camera.near = 0.01;
+			directionalLight.shadow.camera.far = 500;
+			directionalLight.shadow.camera.right = 30;
+			directionalLight.shadow.camera.left = - 30;
+			directionalLight.shadow.camera.top	= 30;
+			directionalLight.shadow.camera.bottom = - 30;
+			directionalLight.shadow.mapSize.width = 1024;
+			directionalLight.shadow.mapSize.height = 1024;
+			directionalLight.shadow.radius = 4;
+			directionalLight.shadow.bias = - 0.00006;
+			scene.add( directionalLight );
+
+			const container = document.getElementById( 'container' );
+
+			const renderer = new THREE.WebGLRenderer( { antialias: true } );
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			renderer.setAnimationLoop( animate );
+			renderer.shadowMap.enabled = true;
+			renderer.shadowMap.type = THREE.VSMShadowMap;
+			renderer.toneMapping = THREE.ACESFilmicToneMapping;
+			container.appendChild( renderer.domElement );
+
+			const stats = new Stats();
+			stats.domElement.style.position = 'absolute';
+			stats.domElement.style.top = '0px';
+			container.appendChild( stats.domElement );
+
+			const GRAVITY = 30;
+			const STEPS_PER_FRAME = 5;
+
+			const worldOctree = new Octree();
+			const playerCollider = new Capsule( new THREE.Vector3( 0, 0.35, 0 ), new THREE.Vector3( 0, 1, 0 ), 0.35 );
+			const playerVelocity = new THREE.Vector3();
+			const playerDirection = new THREE.Vector3();
+
+			let playerOnFloor = false;
+
+			const keyStates = {};
+
+			// Opponent player model (pill/capsule shape)
+			let opponentModel = null;
+			const opponentGeometry = new THREE.CapsuleGeometry( 0.35, 0.65, 4, 8 );
+			const opponentMaterial = new THREE.MeshLambertMaterial( { color: 0xff4444 } );
+			opponentModel = new THREE.Mesh( opponentGeometry, opponentMaterial );
+			opponentModel.castShadow = true;
+			opponentModel.receiveShadow = true;
+			opponentModel.visible = false;
+			scene.add( opponentModel );
+
+			// Throwable spheres (bullets)
+			const NUM_SPHERES = 50;
+			const SPHERE_RADIUS = 0.2;
+			const sphereGeometry = new THREE.IcosahedronGeometry( SPHERE_RADIUS, 5 );
+			const sphereMaterial = new THREE.MeshLambertMaterial( { color: 0xdede8d } );
+
+			const spheres = [];
+			let sphereIdx = 0;
+
+			for ( let i = 0; i < NUM_SPHERES; i ++ ) {
+				const sphere = new THREE.Mesh( sphereGeometry, sphereMaterial );
+				sphere.castShadow = true;
+				sphere.receiveShadow = true;
+				scene.add( sphere );
+
+				spheres.push( {
+					mesh: sphere,
+					collider: new THREE.Sphere( new THREE.Vector3( 0, - 100, 0 ), SPHERE_RADIUS ),
+					velocity: new THREE.Vector3(),
+					isMyBullet: false  // Track ownership
+				} );
+			}
+
+			document.addEventListener( 'keydown', ( event ) => {
+				keyStates[ event.code ] = true;
+			} );
+
+			document.addEventListener( 'keyup', ( event ) => {
+				keyStates[ event.code ] = false;
+			} );
+
+			container.addEventListener( 'mousedown', () => {
+				document.body.requestPointerLock();
+			} );
+
+			document.addEventListener( 'click', () => {
+				if ( document.pointerLockElement === document.body && !isDead ) {
+					shoot();
+				}
+			} );
+
+			document.body.addEventListener( 'mousemove', ( event ) => {
+				if ( document.pointerLockElement === document.body ) {
+					camera.rotation.y -= event.movementX / 1000;
+					camera.rotation.x -= event.movementY / 1000;
+				}
+			} );
+
+			window.addEventListener( 'resize', onWindowResize );
+
+			function onWindowResize() {
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+			}
+
+			function shoot() {
+				const sphere = spheres[ sphereIdx ];
+
+				camera.getWorldDirection( playerDirection );
+
+				sphere.collider.center.copy( playerCollider.end ).addScaledVector( playerDirection, playerCollider.radius * 1.5 );
+
+				const impulse = 35;
+				sphere.velocity.copy( playerDirection ).multiplyScalar( impulse );
+				sphere.velocity.addScaledVector( playerVelocity, 2 );
+				sphere.isMyBullet = true;  // Mark as my bullet
+
+				sphereIdx = ( sphereIdx + 1 ) % spheres.length;
+
+				// Send shoot event to opponent
+				if ( ws && ws.readyState === WebSocket.OPEN ) {
+					ws.send(JSON.stringify({
+						type: 'shoot',
+						position: sphere.collider.center.toArray(),
+						direction: playerDirection.toArray()
+					}));
+				}
+			}
+
+			function playerCollisions() {
+				const result = worldOctree.capsuleIntersect( playerCollider );
+				playerOnFloor = false;
+
+				if ( result ) {
+					playerOnFloor = result.normal.y > 0;
+
+					if ( ! playerOnFloor ) {
+						playerVelocity.addScaledVector( result.normal, - result.normal.dot( playerVelocity ) );
+					}
+
+					if ( result.depth >= 1e-10 ) {
+						playerCollider.translate( result.normal.multiplyScalar( result.depth ) );
+					}
+				}
+			}
+
+			function updatePlayer( deltaTime ) {
+				let damping = Math.exp( - 4 * deltaTime ) - 1;
+
+				if ( ! playerOnFloor ) {
+					playerVelocity.y -= GRAVITY * deltaTime;
+					damping *= 0.1;
+				}
+
+				playerVelocity.addScaledVector( playerVelocity, damping );
+
+				const deltaPosition = playerVelocity.clone().multiplyScalar( deltaTime );
+				playerCollider.translate( deltaPosition );
+
+				playerCollisions();
+
+				camera.position.copy( playerCollider.end );
+			}
+
+			function getForwardVector() {
+				camera.getWorldDirection( playerDirection );
+				playerDirection.y = 0;
+				playerDirection.normalize();
+				return playerDirection;
+			}
+
+			function getSideVector() {
+				camera.getWorldDirection( playerDirection );
+				playerDirection.y = 0;
+				playerDirection.normalize();
+				playerDirection.cross( camera.up );
+				return playerDirection;
+			}
+
+			function controls( deltaTime ) {
+				if ( isDead ) return;
+
+				const speedDelta = deltaTime * ( playerOnFloor ? 25 : 8 );
+
+				if ( keyStates[ 'KeyW' ] ) {
+					playerVelocity.add( getForwardVector().multiplyScalar( speedDelta ) );
+				}
+
+				if ( keyStates[ 'KeyS' ] ) {
+					playerVelocity.add( getForwardVector().multiplyScalar( - speedDelta ) );
+				}
+
+				if ( keyStates[ 'KeyA' ] ) {
+					playerVelocity.add( getSideVector().multiplyScalar( - speedDelta ) );
+				}
+
+				if ( keyStates[ 'KeyD' ] ) {
+					playerVelocity.add( getSideVector().multiplyScalar( speedDelta ) );
+				}
+
+				if ( playerOnFloor ) {
+					if ( keyStates[ 'Space' ] ) {
+						playerVelocity.y = 15;
+					}
+				}
+			}
+
+			const loader = new GLTFLoader().setPath( './models/gltf/' );
+
+			loader.load( 'collision-world.glb', ( gltf ) => {
+				scene.add( gltf.scene );
+				worldOctree.fromGraphNode( gltf.scene );
+
+				gltf.scene.traverse( child => {
+					if ( child.isMesh ) {
+						child.castShadow = true;
+						child.receiveShadow = true;
+
+						if ( child.material.map ) {
+							child.material.map.anisotropy = 4;
+						}
+					}
+				} );
+
+				// Initialize game state - we already have opponent info from URL params
+				gameStarted = true;
+				opponentModel.visible = true;
+				// Set initial opponent position slightly offset so they're visible
+				opponentModel.position.set(5, 1, 5);
+				document.getElementById('opponent-name').textContent = opponentUsername;
+
+				console.log('World loaded. Opponent model visible:', opponentModel.visible);
+				console.log('Opponent position:', opponentModel.position);
+				console.log('Game started with opponent:', opponentUsername, '(ID:', opponentUserId, ')');
+
+				// Connect WebSocket after world is loaded
+				connectWebSocket();
+			} );
+
+			function teleportPlayerIfOob() {
+				if ( camera.position.y <= - 25 ) {
+					respawnPlayer();
+				}
+			}
+
+			function respawnPlayer() {
+				// Random spawn position
+				const spawnX = (Math.random() - 0.5) * 20;
+				const spawnZ = (Math.random() - 0.5) * 20;
+
+				playerCollider.start.set( spawnX, 0.35, spawnZ );
+				playerCollider.end.set( spawnX, 1, spawnZ );
+				playerCollider.radius = 0.35;
+				camera.position.copy( playerCollider.end );
+				camera.rotation.set( 0, 0, 0 );
+				playerVelocity.set( 0, 0, 0 );
+
+				isDead = false;
+				document.getElementById('respawn-message').style.display = 'none';
+			}
+
+			function handleDeath() {
+				isDead = true;
+				document.getElementById('respawn-message').style.display = 'block';
+
+				setTimeout(() => {
+					respawnPlayer();
+				}, 2000);
+			}
+
+			function updateSpheres( deltaTime ) {
+				spheres.forEach( sphere => {
+					sphere.collider.center.addScaledVector( sphere.velocity, deltaTime );
+
+					const result = worldOctree.sphereIntersect( sphere.collider );
+
+					if ( result ) {
+						// Despawn if hit ground (y normal is positive for floor)
+						if ( result.normal.y > 0.5 ) {
+							sphere.collider.center.set( 0, - 100, 0 );
+							sphere.velocity.set( 0, 0, 0 );
+							return;
+						}
+						sphere.velocity.addScaledVector( result.normal, - result.normal.dot( sphere.velocity ) * 1.5 );
+						sphere.collider.center.add( result.normal.multiplyScalar( result.depth ) );
+					} else {
+						sphere.velocity.y -= GRAVITY * deltaTime;
+					}
+
+					const damping = Math.exp( - 1.5 * deltaTime ) - 1;
+					sphere.velocity.addScaledVector( sphere.velocity, damping );
+
+					// Check collision with opponent - ONLY for my bullets
+					if ( gameStarted && opponentModel && opponentModel.visible && sphere.isMyBullet ) {
+						const distance = sphere.collider.center.distanceTo( opponentModel.position );
+						if ( distance < SPHERE_RADIUS + 0.7 ) {
+							// Hit opponent!
+							console.log('HIT! Sending hit message to server');
+							if ( ws && ws.readyState === WebSocket.OPEN ) {
+								ws.send(JSON.stringify({
+									type: 'hit'
+								}));
+							}
+							// Reset ball
+							sphere.collider.center.set( 0, - 100, 0 );
+							sphere.velocity.set( 0, 0, 0 );
+							sphere.isMyBullet = false;  // Reset ownership
+						}
+					}
+				} );
+
+				for ( const sphere of spheres ) {
+					sphere.mesh.position.copy( sphere.collider.center );
+				}
+			}
+
+			function animate() {
+				const deltaTime = Math.min( 0.05, clock.getDelta() ) / STEPS_PER_FRAME;
+
+				for ( let i = 0; i < STEPS_PER_FRAME; i ++ ) {
+					controls( deltaTime );
+					updatePlayer( deltaTime );
+					updateSpheres( deltaTime );
+					teleportPlayerIfOob();
+				}
+
+				// Send position updates (throttled for debugging)
+				if ( ws && ws.readyState === WebSocket.OPEN && !isDead && gameStarted ) {
+					// Only send every 10th frame to reduce console spam
+					if (Math.random() < 0.01) {
+						console.log('Sending position update:', camera.position.toArray());
+					}
+					ws.send(JSON.stringify({
+						type: 'playerUpdate',
+						position: camera.position.toArray(),
+						rotation: [camera.rotation.x, camera.rotation.y, camera.rotation.z]
+					}));
+				}
+
+				renderer.render( scene, camera );
+				stats.update();
+			}
+
+			// WebSocket handling
+			async function connectWebSocket() {
+				try {
+					const tokenResponse = await fetch('/api/wstoken');
+					if (!tokenResponse.ok) {
+						window.location.href = '/login.html';
+						return;
+					}
+
+					const tokenData = await tokenResponse.json();
+					ws = new WebSocket(`ws://${window.location.host}?token=${tokenData.token}`);
+
+				ws.onopen = () => {
+					console.log('Connected to game server');
+					// Rejoin the game since we're coming from the lobby
+					ws.send(JSON.stringify({
+						type: 'rejoinGame',
+						gameId: gameId
+					}));
+					console.log('Sent rejoinGame message for gameId:', gameId);
+				};
+
+				ws.onmessage = (event) => {
+					const data = JSON.parse(event.data);
+					handleGameMessage(data);
+				};
+
+				ws.onclose = () => {
+					console.log('Disconnected from server');
+				};
+				} catch (error) {
+					console.error('WebSocket connection error:', error);
+					window.location.href = '/login.html';
+				}
+			}
+
+			function handleGameMessage(data) {
+				console.log('WebSocket message:', data.type, data);
+
+				switch (data.type) {
+					case 'connected':
+						myUserId = data.userId;
+						console.log('Connected! My user ID:', myUserId);
+						break;
+
+					case 'gameRejoined':
+						console.log('Successfully rejoined game:', data.gameId);
+						console.log('Current scores:', data.scores);
+						// Update scores if they exist
+						if (data.scores && myUserId && opponentUserId) {
+							myScore = data.scores[myUserId] || 0;
+							opponentScore = data.scores[opponentUserId] || 0;
+							document.getElementById('your-score').textContent = myScore;
+							document.getElementById('opponent-score').textContent = opponentScore;
+						}
+						break;
+
+					case 'error':
+						console.error('Server error:', data.message);
+						alert('Error: ' + data.message);
+						window.location.href = '/lobby.html';
+						break;
+
+					case 'matchFound':
+						opponentUserId = data.opponent.id;
+						opponentUsername = data.opponent.username;
+						document.getElementById('opponent-name').textContent = data.opponent.username;
+
+						// Initialize game state
+						gameStarted = true;
+						opponentModel.visible = true;
+
+						console.log('Match found!');
+						console.log('- My ID:', myUserId);
+						console.log('- Opponent ID:', opponentUserId);
+						console.log('- Opponent name:', opponentUsername);
+						console.log('- Opponent model visible:', opponentModel.visible);
+						console.log('- Opponent model position:', opponentModel.position);
+						break;
+
+					case 'opponentUpdate':
+						if (opponentModel && data.position) {
+							const newPos = new THREE.Vector3(
+								data.position[0],
+								data.position[1] - 0.3,
+								data.position[2]
+							);
+							opponentModel.position.copy(newPos);
+
+							if (data.rotation) {
+								opponentModel.rotation.y = data.rotation[1];
+							}
+
+							// Debug logging (throttled)
+							if (Math.random() < 0.01) {
+								console.log('Received opponent update. New position:', newPos.toArray());
+								console.log('Opponent model visible:', opponentModel.visible);
+							}
+						} else {
+							console.log('WARNING: Received opponentUpdate but model not ready or no position data', {
+								hasModel: !!opponentModel,
+								hasPosition: !!data.position,
+								data: data
+							});
+						}
+						break;
+
+					case 'opponentShoot':
+						// Opponent shot a ball - spawn it on our side to see their bullets
+						if (data.position && data.direction) {
+							const sphere = spheres[sphereIdx];
+
+							// Set position from opponent's shot
+							sphere.collider.center.set(
+								data.position[0],
+								data.position[1],
+								data.position[2]
+							);
+
+							// Set velocity from opponent's shot direction
+							const direction = new THREE.Vector3(
+								data.direction[0],
+								data.direction[1],
+								data.direction[2]
+							);
+							const impulse = 35;
+							sphere.velocity.copy(direction).multiplyScalar(impulse);
+							sphere.isMyBullet = false;  // Mark as opponent's bullet
+
+							sphereIdx = (sphereIdx + 1) % spheres.length;
+
+							console.log('Opponent shot! Position:', data.position, 'Direction:', data.direction);
+						}
+						break;
+
+					case 'died':
+						console.log('You died!');
+						handleDeath();
+						break;
+
+					case 'scored':
+						// Visual feedback for scoring
+						console.log('You scored!');
+						break;
+
+					case 'scoreUpdate':
+						if (myUserId && opponentUserId) {
+							myScore = data.scores[myUserId] || 0;
+							opponentScore = data.scores[opponentUserId] || 0;
+							document.getElementById('your-score').textContent = myScore;
+							document.getElementById('opponent-score').textContent = opponentScore;
+							console.log('Score update:', myScore, '-', opponentScore);
+						}
+						break;
+
+					case 'gameOver':
+						const won = data.winnerId === myUserId;
+						document.getElementById('game-result').textContent = won ? 'VICTORY!' : 'DEFEAT';
+						document.getElementById('game-result').style.color = won ? '#4CAF50' : '#f44336';
+						document.getElementById('final-score').textContent =
+							`Final Score: ${myScore} - ${opponentScore}`;
+						document.getElementById('game-over').style.display = 'block';
+						break;
+
+					case 'opponentDisconnected':
+						alert(data.message);
+						window.location.href = '/lobby.html';
+						break;
+				}
+			}
+
+			window.returnToLobby = function() {
+				if (ws) ws.close();
+				window.location.href = '/lobby.html';
+			};
+
+		</script>
+	</body>
+</html>
