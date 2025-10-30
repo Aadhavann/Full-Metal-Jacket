@@ -1,8 +1,8 @@
-# Full Rubber Jacket 🎮
+# Full Rubber Jacket 
 
 A real-time 1v1 multiplayer first-person shooter built with Three.js, Node.js, and WebSockets. Features stunning visuals with a dark Material UI theme and custom background imagery.
 
-## ✨ Features
+##  Features
 
 - **User Authentication**: Secure register/login system with bcrypt password hashing
 - **Real-time Matchmaking**: Automatic 1v1 player pairing system
@@ -14,7 +14,7 @@ A real-time 1v1 multiplayer first-person shooter built with Three.js, Node.js, a
 - **Modern UI**: Dark Material UI theme with glass morphism effects and smooth animations
 - **Custom Backgrounds**: Stunning visual design with custom imagery
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
 
@@ -37,7 +37,7 @@ node server.js
 http://localhost:3000/login.html
 ```
 
-## 🎮 How to Play
+## How to Play
 
 ### Getting Started
 1. **Register/Login**: Create an account or login at `/login.html`
@@ -52,13 +52,13 @@ http://localhost:3000/login.html
 - **ESC**: Release pointer lock (pause game)
 
 ### Game Rules
-- ⚡ **First to 5 kills** wins the match
-- 💀 **One-hit-kill** mechanics - every shot counts!
-- ⏱️ **2-second respawn** delay after death
-- 🎲 **Random spawn locations** to keep gameplay fair
-- 🏆 **Winner saved** to match history database
+-  **First to 5 kills** wins the match
+-  **One-hit-kill** mechanics - every shot counts!
+-  **2-second respawn** delay after death
+-  **Random spawn locations** to keep gameplay fair
+-  **Winner saved** to match history database
 
-## 🌐 Playing with Friends
+## Playing with Friends
 
 ### Option 1: Same WiFi Network (Easiest!)
 
@@ -126,7 +126,7 @@ Deploy to a cloud service for 24/7 availability:
 #### **Render.com** (Easiest, Free Tier Available)
 1. Push your code to GitHub
 2. Sign up at https://render.com
-3. Create new "Web Service"
+3. Create a new "Web Service"
 4. Connect your GitHub repo
 5. Build command: `npm install`
 6. Start command: `node server.js`
@@ -146,7 +146,7 @@ Deploy to a cloud service for 24/7 availability:
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 FPS/
@@ -200,7 +200,7 @@ CREATE TABLE games (
 );
 ```
 
-## 🔌 API Endpoints
+## API Endpoints
 
 ### Authentication
 | Method | Endpoint | Description | Auth Required |
@@ -243,25 +243,7 @@ CREATE TABLE games (
 | `gameOver` | `{winnerId, scores}` | Match ended |
 | `opponentDisconnected` | `{message}` | Opponent left |
 
-## 🎨 UI/UX Features
-
-### Dark Material UI Theme
-- **Color Palette**:
-  - Background: Dark gradients (#1a1a2e, #16213e, #0f3460)
-  - Primary: Light blue (#90caf9, #64b5f6, #42a5f5)
-  - Success: Green (#4caf50)
-  - Error: Red (#f44336)
-
-### Visual Effects
-- ✨ **Glass Morphism**: Frosted glass effect with backdrop blur
-- 🌊 **Gradient Animations**: Slowly shifting background gradients
-- 💫 **Smooth Transitions**: 0.3s ease transitions on all interactions
-- 🎭 **Hover Effects**: Scale, glow, and elevation on hover
-- 🌈 **Gradient Text**: Shiny gradient titles
-- 🔵 **Ripple Effects**: Expanding circles on button clicks
-- ⚡ **Shimmer Effects**: Light sweeps across elements
-- 📊 **Staggered Animations**: Sequential fade-ins
-- 🎪 **Floating Animations**: Gentle up/down motion
+## UI/UX Features
 
 ### Custom Backgrounds
 - **login.jpg**: Used on login/register page
@@ -294,63 +276,7 @@ CREATE TABLE games (
 - **GLTFLoader**: 3D model loading
 - **Stats.js**: Performance monitoring
 
-## 🐛 Bug Fixes & Improvements
-
-### Major Fixes
-1. ✅ **Fixed WebSocket Reconnection**: Implemented `rejoinGame` mechanism with 10-second grace period
-2. ✅ **Fixed Duplicate Hit Registration**: Added bullet ownership tracking (`isMyBullet` flag)
-3. ✅ **Fixed Both Players Respawning**: Only victim respawns now
-4. ✅ **Fixed Opponent Not Visible**: Proper game state initialization from URL params
-5. ✅ **Fixed Shots Not Registering**: Server properly broadcasts opponent shots
-
-### Performance Optimizations
-- Object pooling for bullets (50 spheres reused)
-- Throttled position updates (60 Hz)
-- Efficient collision detection with Octree
-
-## 🔒 Security Considerations
-
-**⚠️ This is a development version. Before production deployment:**
-
-1. **Change JWT Secret**:
-   ```javascript
-   const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key';
-   ```
-
-2. **Use HTTPS/WSS**:
-   - HTTP → HTTPS
-   - WS → WSS (secure WebSockets)
-
-3. **Add Rate Limiting**:
-   ```bash
-   npm install express-rate-limit
-   ```
-
-4. **Input Validation**:
-   - Sanitize user inputs
-   - Validate all WebSocket messages
-
-5. **Environment Variables**:
-   ```bash
-   npm install dotenv
-   ```
-
-6. **CORS Configuration**:
-   ```javascript
-   app.use(cors({ origin: 'your-domain.com' }));
-   ```
-
-7. **Session Security**:
-   - Secure cookie flags
-   - CSRF protection
-   - Session expiration
-
-8. **Server-Side Validation**:
-   - Validate hit detection server-side
-   - Add anti-cheat measures
-   - Rate limit position updates
-
-## 📊 Game Mechanics
+## Game Mechanics
 
 ### Movement System
 - Ground speed: 25 units/second
@@ -370,28 +296,6 @@ CREATE TABLE games (
 - Player identification via JWT
 - Game instance management
 
-## 🎯 Known Limitations
-
-1. **Client-Side Hit Detection**: Vulnerable to manipulation (consider server-side validation)
-2. **No Anti-Cheat**: Position and hit validation needed
-3. **No Lag Compensation**: No client prediction or interpolation
-4. **High Bandwidth**: Full position sent every frame (consider delta compression)
-5. **Two-Player Only**: Current architecture supports 1v1 only
-
-## 🚧 Future Enhancements
-
-- [ ] Server-side hit validation
-- [ ] Client-side prediction
-- [ ] Lag compensation
-- [ ] Spectator mode
-- [ ] Multiple game modes (Team Deathmatch, Free-for-All)
-- [ ] Weapon variety
-- [ ] Power-ups and pickups
-- [ ] Leaderboards
-- [ ] Friend system
-- [ ] Voice chat integration
-- [ ] Mobile support
-
 ## 📝 Credits
 
 - **Three.js**: Foundation for 3D graphics
@@ -405,40 +309,7 @@ This project is for educational purposes. Feel free to modify and extend for lea
 
 ---
 
-## 💡 Tips for Best Experience
-
-1. **Use a good internet connection** for smooth multiplayer
-2. **Enable hardware acceleration** in your browser
-3. **Use Chrome or Firefox** for best Three.js performance
-4. **Close unnecessary tabs** to free up GPU resources
-5. **Adjust graphics settings** if experiencing lag (coming soon!)
-
----
-
-## 🤝 Contributing
-
-Want to improve Full Rubber Jacket? Here's how:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
-## 📞 Support
-
-Having issues? Check out:
-- Review the console logs (F12 in browser)
-- Check server terminal for errors
-- Ensure all dependencies are installed
-- Verify port 3000 is not in use
-- Check firewall settings for local network play
-
----
-
-**Built with ❤️ for VIT Internet and Web Programming Course**
+**Built for VIT Internet and Web Programming Course**
 
 **Game Name**: Full Rubber Jacket 🎮
 **Version**: 1.0.0
