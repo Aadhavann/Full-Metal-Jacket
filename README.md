@@ -2,8 +2,6 @@
 
 A real-time 1v1 multiplayer first-person shooter built with Three.js, Node.js, and WebSockets. Features stunning visuals with a dark Material UI theme and custom background imagery.
 
-![Game Screenshot](./background.jpg)
-
 ## ✨ Features
 
 - **User Authentication**: Secure register/login system with bcrypt password hashing
